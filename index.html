@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a0b0b">
+    <meta name="display" content="fullscreen">
+    <title>Custom Racing Gamepad - Editor Edition</title>
+    
+    <style>
+        body {
+            background-color: #1a0b0b; margin: 0; padding: 0;
+            display: flex; height: 100vh; width: 100vw; touch-action: none; 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            color: white; overflow: hidden; user-select: none; -webkit-user-select: none;
+        }
+        
+        /* --- 1. Home Screen (Player Selection) --- */
+        #HOME_SCREEN {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #1a0b0b; z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #HOME_SCREEN h1 { font-size: 28px; margin-bottom: 30px; letter-spacing: 2px; }
+        .player-slots { display: flex; gap: 20px; }
+        .slot-btn {
+            width: 80px; height: 80px; font-size: 24px; font-weight: bold; color: white;
+            border: 2px solid rgba(255,255,255,0.2); border-radius: 15px; cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+        }
+        
+        /* --- 2. Edit Mode Toolbar --- */
+        #EDIT_TOOLBAR {
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.9); padding: 10px 20px; border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;
+            display: none; align-items: center; gap: 15px; z-index: 200; border: 2px solid #ff1a1a; border-top: none;
+        }
+        .tool-btn {
+            background: #440000; color: white; border: 1px solid #ff1a1a; border-radius: 8px;
+            padding: 8px 12px; font-size: 14px; font-weight: bold; cursor: pointer;
+        }
+        .tool-btn:active { background: #ff1a1a; }
+        
+        /* --- 3. Game Controller Container & Elements --- */
+        #GAME_UI { width: 100%; height: 100%; position: relative; display: none; }
+        
+        .btn {
+            position: absolute; background-color: #cc0000; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-weight: bold;
+            box-shadow: 0 5px 8px rgba(0,0,0,0.6); cursor: pointer;
+            /* Every button is centered on its coordinates for easy resizing/dragging */
+            transform: translate(-50%, -50%);
+        }
+        .btn:active, .btn.active { background-color: #ff1a1a; box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); }
+        .btn.editing-selected { border: 3px dashed #ffffff; box-shadow: 0 0 15px #ffffff; background-color: #ff4d4d; z-index: 100;}
+
+        #TILT_BAR { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 60%; height: 10px; background-color: #2a0808; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; display: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); z-index: 100; }
+        #TILT_INDICATOR { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 20%; height: 100%; background-color: #ff1a1a; border-radius: 6px; transition: left 0.05s ease-out; }
+
+        /* Symmetrical Top Menu */
+        .top-menu {
+            position: absolute; top: 12%; left: 50%; transform: translate(-50%, -50%); /* Centered */
+            display: flex; align-items: center; justify-content: center; gap: 25px; z-index: 50;
+        }
+        .top-menu .sys-btn { position: relative; transform: none; } /* Override absolute for flexbox */
+
+        #START { width: 50px; height: 50px; font-size: 22px; }
+        #EDIT_TOGGLE { width: 60px; height: 45px; font-size: 16px; border-radius: 10px; background-color: #555; }
+        #TILT_TOGGLE { width: 85px; height: 45px; font-size: 14px; border-radius: 22px; }
+        #FULLSCREEN { width: 50px; height: 45px; font-size: 16px; border-radius: 10px; }
+
+        /* FLATTENED DEFAULT LANDSCAPE LAYOUT */
+        #LT { top: 15%; left: 10%; width: 100px; height: 100px; font-size: 24px; }
+        #RT { top: 15%; left: 90%; width: 100px; height: 100px; font-size: 24px; }
+        #STEER_LEFT { top: 75%; left: 15%; width: 150px; height: 150px; font-size: 22px; }
+        #STEER_RIGHT { top: 75%; left: 85%; width: 150px; height: 150px; font-size: 22px; }
+
+        /* D-Pad (Anchored around X: 28%, Y: 60%) */
+        #UP { top: 44%; left: 28%; width: 55px; height: 55px; font-size: 22px; }
+        #DOWN { top: 76%; left: 28%; width: 55px; height: 55px; font-size: 22px; }
+        #LEFT { top: 60%; left: 20%; width: 55px; height: 55px; font-size: 22px; }
+        #RIGHT { top: 60%; left: 36%; width: 55px; height: 55px; font-size: 22px; }
+
+        /* Action (Anchored around X: 72%, Y: 60%) */
+        #Y { top: 44%; left: 72%; width: 55px; height: 55px; font-size: 22px; }
+        #A { top: 76%; left: 72%; width: 55px; height: 55px; font-size: 22px; }
+        #X { top: 60%; left: 64%; width: 55px; height: 55px; font-size: 22px; }
+        #B { top: 60%; left: 80%; width: 55px; height: 55px; font-size: 22px; }
+
+    </style>
+</head>
+<body>
+    <div id="HOME_SCREEN">
+        <h1>SELECT YOUR PLAYER</h1>
+        <div class="player-slots">
+            <button class="slot-btn" style="background: #cc0000;" onclick="startGame(1)">P1</button>
+            <button class="slot-btn" style="background: #0055cc;" onclick="startGame(2)">P2</button>
+            <button class="slot-btn" style="background: #008000;" onclick="startGame(3)">P3</button>
+            <button class="slot-btn" style="background: #b3b300; color: black;" onclick="startGame(4)">P4</button>
+        </div>
+    </div>
+
+    <div id="EDIT_TOOLBAR">
+        <span style="font-size: 12px; opacity: 0.8;">Edit Mode</span>
+        <button class="tool-btn" onclick="resizeSelected(10)">Size +</button>
+        <button class="tool-btn" onclick="resizeSelected(-10)">Size -</button>
+        <button class="tool-btn" onclick="resetLayout()">Reset</button>
+        <button class="tool-btn" style="background: #008000;" onclick="toggleEditMode()">Save</button>
+    </div>
+
+    <div id="GAME_UI">
+        <div id="TILT_BAR"><div id="TILT_INDICATOR"></div></div>
+
+        <div class="top-menu">
+            <div class="btn game-btn sys-btn" id="START">☰</div>
+            <div class="btn sys-btn" id="EDIT_TOGGLE" onclick="toggleEditMode()">✎ Edit</div>
+            <div class="btn sys-btn" id="TILT_TOGGLE">Tilt: OFF</div>
+            <div class="btn sys-btn" id="FULLSCREEN">[ &nbsp;]</div>
+        </div>
+
+        <div class="btn game-btn" id="LT">LT</div>
+        <div class="btn game-btn" id="RT">RT</div>
+        <div class="btn game-btn" id="UP">^</div>
+        <div class="btn game-btn" id="DOWN">v</div>
+        <div class="btn game-btn" id="LEFT">&lt;</div>
+        <div class="btn game-btn" id="RIGHT">&gt;</div>
+        <div class="btn game-btn" id="Y">Y</div>
+        <div class="btn game-btn" id="X">X</div>
+        <div class="btn game-btn" id="B">B</div>
+        <div class="btn game-btn" id="A">A</div>
+        <div class="btn game-btn" id="STEER_LEFT">&lt;&lt; Left</div>
+        <div class="btn game-btn" id="STEER_RIGHT">Right &gt;&gt;</div>
+    </div>
+
+    <script>
+        // --- Global Variables ---
+        let currentPlayer = 1; 
+        let isEditMode = false;
+        let selectedBtn = null;
+        
+        let tiltEnabled = false;
+        let currentTilt = 0;
+        let lastSentTilt = 0;
+
+        // --- 1. Boot Sequence & Layout Management ---
+        function startGame(playerNumber) {
+            currentPlayer = playerNumber;
+            document.getElementById('HOME_SCREEN').style.display = 'none';
+            document.getElementById('GAME_UI').style.display = 'block';
+            
+            // Attempt to go fullscreen automatically on start
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            }
+            
+            loadLayout();
+        }
+
+        function saveLayout() {
+            let layoutData = {};
+            document.querySelectorAll('.game-btn').forEach(btn => {
+                layoutData[btn.id] = {
+                    left: btn.style.left || window.getComputedStyle(btn).left,
+                    top: btn.style.top || window.getComputedStyle(btn).top,
+                    width: btn.style.width || window.getComputedStyle(btn).width,
+                    height: btn.style.height || window.getComputedStyle(btn).height
+                };
+            });
+            localStorage.setItem('gamepad_P' + currentPlayer, JSON.stringify(layoutData));
+        }
+
+        function loadLayout() {
+            let saved = localStorage.getItem('gamepad_P' + currentPlayer);
+            if (saved) {
+                let layoutData = JSON.parse(saved);
+                for (let id in layoutData) {
+                    let btn = document.getElementById(id);
+                    if (btn) {
+                        btn.style.left = layoutData[id].left;
+                        btn.style.top = layoutData[id].top;
+                        btn.style.width = layoutData[id].width;
+                        btn.style.height = layoutData[id].height;
+                    }
+                }
+            }
+        }
+
+        function resetLayout() {
+            localStorage.removeItem('gamepad_P' + currentPlayer);
+            location.reload(); // Quickest way to wipe inline styles and go back to default CSS
+        }
+
+        // --- 2. Edit Mode & Dragging Logic ---
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const toolbar = document.getElementById('EDIT_TOOLBAR');
+            const editToggleBtn = document.getElementById('EDIT_TOGGLE');
+            
+            if (isEditMode) {
+                toolbar.style.display = 'flex';
+                editToggleBtn.style.backgroundColor = '#ff4d4d';
+                editToggleBtn.innerText = "Saving...";
+                // Show borders to indicate draggable items
+                document.querySelectorAll('.game-btn').forEach(b => b.style.border = '2px dashed rgba(255,255,255,0.3)');
+            } else {
+                toolbar.style.display = 'none';
+                editToggleBtn.style.backgroundColor = '#555';
+                editToggleBtn.innerText = "✎ Edit";
+                if(selectedBtn) selectedBtn.classList.remove('editing-selected');
+                selectedBtn = null;
+                // Remove dashed borders
+                document.querySelectorAll('.game-btn').forEach(b => b.style.border = '2px solid #5a0000');
+                saveLayout();
+            }
+        }
+
+        function resizeSelected(amount) {
+            if (!selectedBtn) return;
+            let currentWidth = parseInt(window.getComputedStyle(selectedBtn).width);
+            let newSize = (currentWidth + amount) + 'px';
+            selectedBtn.style.width = newSize;
+            selectedBtn.style.height = newSize;
+        }
+
+        let dragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            if (!isEditMode || !e.target.classList.contains('game-btn')) return;
+            
+            if(selectedBtn) selectedBtn.classList.remove('editing-selected');
+            selectedBtn = e.target;
+            selectedBtn.classList.add('editing-selected');
+            
+            dragging = true;
+            let touch = e.touches[0];
+            let rect = selectedBtn.getBoundingClientRect();
+            
+            // Calculate where the user's finger is relative to the exact center of the button
+            dragOffsetX = touch.clientX - (rect.left + rect.width/2);
+            dragOffsetY = touch.clientY - (rect.top + rect.height/2);
+        }, {passive: false});
+
+        document.addEventListener('touchmove', (e) => {
+            if (!dragging || !selectedBtn) return;
+            e.preventDefault(); // Stop screen from scrolling while dragging
+            
+            let touch = e.touches[0];
+            // Convert exact pixels to responsive screen percentages
+            let newLeftPct = ((touch.clientX - dragOffsetX) / window.innerWidth) * 100;
+            let newTopPct = ((touch.clientY - dragOffsetY) / window.innerHeight) * 100;
+            
+            selectedBtn.style.left = newLeftPct + '%';
+            selectedBtn.style.top = newTopPct + '%';
+        }, {passive: false});
+
+        document.addEventListener('touchend', () => { dragging = false; });
+
+        // --- 3. Communication & Gameplay Logic ---
+        function sendAction(button, state) {
+            if (isEditMode) return; // Completely disable server calls while editing
+            fetch('/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ button: button, state: state, player: currentPlayer })
+            });
+        }
+
+        document.querySelectorAll('.game-btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                if (isEditMode) return;
+                e.preventDefault(); 
+                btn.classList.add('active');
+                if (navigator.vibrate) navigator.vibrate(40);
+                sendAction(btn.id, 'press');
+            });
+            btn.addEventListener('touchend', (e) => {
+                if (isEditMode) return;
+                e.preventDefault();
+                btn.classList.remove('active');
+                sendAction(btn.id, 'release');
+            });
+            
+            // Mouse fallbacks for PC testing
+            btn.addEventListener('mousedown', (e) => {
+                if(isEditMode) {
+                    if(selectedBtn) selectedBtn.classList.remove('editing-selected');
+                    selectedBtn = btn;
+                    selectedBtn.classList.add('editing-selected');
+                } else {
+                    sendAction(btn.id, 'press');
+                }
+            });
+            btn.addEventListener('mouseup', () => { if(!isEditMode) sendAction(btn.id, 'release'); });
+            btn.addEventListener('mouseleave', () => { if(!isEditMode) sendAction(btn.id, 'release'); });
+        });
+
+        // --- 4. System Buttons (Tilt & Fullscreen) ---
+        const tiltBtn = document.getElementById('TILT_TOGGLE');
+        tiltBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (isEditMode) return;
+            if (navigator.vibrate) navigator.vibrate(40);
+            
+            tiltEnabled = !tiltEnabled;
+            if (tiltEnabled) {
+                tiltBtn.innerText = "Tilt: ON";
+                tiltBtn.style.backgroundColor = "#00b300"; 
+                document.getElementById('STEER_LEFT').style.display = 'none'; 
+                document.getElementById('STEER_RIGHT').style.display = 'none';
+                document.getElementById('TILT_BAR').style.display = 'block'; 
+                
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission().catch(console.error);
+                }
+            } else {
+                tiltBtn.innerText = "Tilt: OFF";
+                tiltBtn.style.backgroundColor = "#cc0000"; 
+                document.getElementById('STEER_LEFT').style.display = 'flex'; 
+                document.getElementById('STEER_RIGHT').style.display = 'flex';
+                document.getElementById('TILT_BAR').style.display = 'none'; 
+                document.getElementById('TILT_INDICATOR').style.left = '50%'; 
+                fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analog_steer: 0, player: currentPlayer }) });
+            }
+        });
+
+        window.addEventListener('deviceorientation', (event) => {
+            if (!tiltEnabled || isEditMode) return;
+            let angle = event.beta || 0; 
+            let maxAngle = 20; 
+            if (angle > maxAngle) angle = maxAngle;
+            if (angle < -maxAngle) angle = -maxAngle;
+            currentTilt = angle / maxAngle;
+
+            document.getElementById('TILT_INDICATOR').style.left = `${50 + (currentTilt * 40)}%`;
+        });
+
+        setInterval(() => {
+            if (tiltEnabled && !isEditMode && Math.abs(currentTilt - lastSentTilt) > 0.05) {
+                fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analog_steer: currentTilt, player: currentPlayer }) });
+                lastSentTilt = currentTilt;
+            }
+        }, 50);
+
+        const fsBtn = document.getElementById('FULLSCREEN');
+        fsBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            fsBtn.classList.add('active');
+            if (navigator.vibrate) navigator.vibrate(40);
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+            else document.exitFullscreen();
+            setTimeout(() => fsBtn.classList.remove('active'), 150);
+        });
+    </script>
+</body>
+</html>
